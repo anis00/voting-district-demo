@@ -230,7 +230,7 @@
 
     <footer class="foot">
       <p>Prototype using the county's precinct file (139 precincts). Address search: Esri World Geocoder with OpenStreetMap fallback; the WordPress version would use Google Geocoding.</p>
-      <p>Built by Anis Harmel. <a href="https://anis00.github.io/anis.harmel-projets/" target="_blank" rel="noopener">Portfolio</a></p>
+      <p>Built by Anis Harmel.</p>
     </footer>
   </section>
 
@@ -281,11 +281,27 @@ const PRECINCTS = {"type":"FeatureCollection","features":[{"type":"Feature","pro
 
   /* ---------- Map ---------- */
   const map = L.map("map", { zoomControl: true, preferCanvas: false });
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+  // Basemaps: no API key needed. Esri light gray canvas + street labels by default, OSM streets as an option.
+  const esriAttr = 'Tiles &copy; <a href="https://www.esri.com">Esri</a>, HERE, Garmin, &copy; OpenStreetMap contributors';
+  map.createPane("labels");
+  map.getPane("labels").style.zIndex = 450;
+  map.getPane("labels").style.pointerEvents = "none";
+  const lightGray = L.layerGroup([
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19, maxNativeZoom: 16, attribution: esriAttr }),
+    L.tileLayer("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}", { maxZoom: 19, maxNativeZoom: 16, pane: "labels" })
+  ]);
+  const osm = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 19,
-    subdomains: "abcd",
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-  }).addTo(map);
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+  });
+  lightGray.addTo(map);
+  L.control.layers({ "Light gray": lightGray, "Streets (OpenStreetMap)": osm }, null, { position: "bottomright" }).addTo(map);
+
+  // If the Esri tiles fail to load, switch to OpenStreetMap automatically.
+  let tileErrors = 0;
+  lightGray.eachLayer((t) => t.on("tileerror", () => {
+    if (++tileErrors === 4 && map.hasLayer(lightGray)) { map.removeLayer(lightGray); osm.addTo(map); }
+  }));
 
   let mode = "NAME";
   let selectedId = null;
